@@ -1,0 +1,815 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Bridge Defense</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    :root {
+      --bg: #06111e;
+      --panel: #0c1c2c;
+      --border: #20384c;
+      --text: #e8f2ff;
+      --muted: #91a8bd;
+      --green: #20d69a;
+      --red: #ff5364;
+      --orange: #ffad42;
+      --blue: #35b7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    header {
+      padding: 19px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .brand { font-size: 24px; font-weight: 800; }
+    .brand span { color: var(--blue); }
+    .subtitle { color: var(--muted); font-size: 13px; margin-top: 5px; }
+
+    .live-tag {
+      border: 1px solid #176b54;
+      color: var(--green);
+      border-radius: 20px;
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 205px minmax(0, 1fr);
+      min-height: calc(100vh - 80px);
+    }
+
+    aside {
+      border-right: 1px solid var(--border);
+      padding: 20px 12px;
+    }
+
+    .nav {
+      display: block;
+      padding: 12px;
+      margin-bottom: 7px;
+      border-radius: 8px;
+      color: #afc3d8;
+      font-size: 14px;
+    }
+
+    .nav.active { background: #12304a; color: var(--blue); }
+
+    main { min-width: 0; padding: 22px; }
+    .section-title { font-size: 20px; margin: 0 0 16px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card, .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .card { padding: 18px; min-width: 0; }
+    .metric-name { color: var(--muted); font-size: 13px; }
+    .metric-value { font-size: 28px; font-weight: 750; margin-top: 10px; overflow-wrap: anywhere; }
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+    .orange { color: var(--orange); }
+    .blue { color: var(--blue); }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .panel {
+      padding: 18px;
+      min-width: 0;
+      margin-bottom: 16px;
+    }
+
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .legend, .small { color: var(--muted); font-size: 12px; }
+    .small { margin-top: 8px; line-height: 1.5; }
+
+    #map {
+      height: 410px;
+      border-radius: 9px;
+      background: #0b1927;
+    }
+
+    .map-note { color: var(--orange); font-size: 11px; margin-top: 10px; }
+
+    .receiver-list { display: grid; gap: 9px; }
+
+    .receiver {
+      width: 100%;
+      text-align: left;
+      color: var(--text);
+      background: #102438;
+      border: 1px solid var(--border);
+      padding: 13px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .receiver.selected { border-color: var(--blue); }
+    .receiver-top { display: flex; justify-content: space-between; gap: 8px; }
+
+    .status {
+      font-size: 11px;
+      border-radius: 12px;
+      padding: 5px 8px;
+      background: #123e34;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .status.attack { background: #4a1d2a; color: var(--red); }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .detail {
+      background: #102438;
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .detail span { color: var(--muted); font-size: 12px; display: block; }
+    .detail strong { display: block; margin-top: 8px; font-size: 20px; overflow-wrap: anywhere; }
+
+    button, select {
+      padding: 11px 13px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-green { background: #0eae78; color: #03170f; }
+    .btn-red { background: #e94459; color: white; }
+    .btn-neutral, select { background: #172c40; color: var(--text); }
+
+    .controls { display: flex; flex-wrap: wrap; gap: 9px; }
+    select { min-width: 145px; max-width: 100%; }
+    .chart-wrap { height: 230px; }
+
+    .event-list { display: grid; gap: 9px; }
+
+    .event {
+      border-left: 3px solid var(--red);
+      background: #102438;
+      border-radius: 5px;
+      padding: 11px;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .event time { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td {
+      padding: 11px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    th { color: var(--blue); }
+
+    footer { color: var(--muted); font-size: 11px; padding: 14px 0; }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background: #102438;
+      color: #edf6ff;
+    }
+
+    .leaflet-container a { color: var(--blue); }
+
+    @media (max-width: 1100px) {
+      .content-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 700px) {
+      .layout { grid-template-columns: 1fr; }
+      aside { display: none; }
+      main { padding: 12px; }
+      header { padding: 15px; }
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric-value { font-size: 23px; }
+      #map { height: 340px; }
+      .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .panel { padding: 13px; }
+    }
+  </style>
+</head>
+
+<body>
+<header>
+  <div>
+    <div class="brand">🛡️ Smart <span>Bridge Defense</span></div>
+    <div class="subtitle">Bridge communication monitoring &amp; DoS defense simulation</div>
+  </div>
+  <div class="live-tag">● LIVE SIMULATION</div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="nav active">▦ Dashboard</div>
+    <div class="nav">⌖ India Map</div>
+    <div class="nav">◉ Receivers</div>
+    <div class="nav">⌁ Live Traffic</div>
+    <div class="nav">⚠ Attack Simulation</div>
+    <div class="nav">▤ Event Logs</div>
+    <div class="nav">⚙ System Status</div>
+
+    <div class="small" style="margin-top:28px;line-height:1.8">
+      <strong>PROJECT STATUS</strong><br>
+      Version 1.0<br>
+      Software-only prototype<br>
+      Hardware integration planned
+    </div>
+  </aside>
+
+  <main>
+    <h2 class="section-title">Security Overview</h2>
+
+    <div class="grid">
+      <div class="card">
+        <div class="metric-name">Total Packets</div>
+        <div class="metric-value" id="total">0</div>
+      </div>
+      <div class="card">
+        <div class="metric-name">Packets / Second</div>
+        <div class="metric-value blue" id="pps">0</div>
+      </div>
+      <div class="card">
+        <div class="metric-name">Accepted</div>
+        <div class="metric-value green" id="accepted">0</div>
+      </div>
+      <div class="card">
+        <div class="metric-name">Dropped</div>
+        <div class="metric-value red" id="dropped">0</div>
+      </div>
+      <div class="card">
+        <div class="metric-name">Invalid Packets</div>
+        <div class="metric-value orange" id="invalid">0</div>
+      </div>
+      <div class="card">
+        <div class="metric-name">Active Attacks</div>
+        <div class="metric-value red" id="attacks">0</div>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div>
+        <section class="panel">
+          <div class="panel-heading">
+            <span>⌖ India Receiver Map</span>
+            <span class="legend">● Normal　● Under attack</span>
+          </div>
+          <div id="map"></div>
+          <div class="map-note">
+            Demo receiver coordinates only — not verified bridge installations.
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">All Receivers</div>
+          <div class="receiver-list" id="receiverList">Loading receivers...</div>
+        </section>
+      </div>
+
+      <div>
+        <section class="panel">
+          <div class="panel-heading">
+            <span id="selectedTitle">Receiver Details</span>
+            <span class="status" id="selectedStatus">CONNECTING</span>
+          </div>
+
+          <div class="detail-grid">
+            <div class="detail"><span>Packets received</span><strong id="rTotal">0</strong></div>
+            <div class="detail"><span>Accepted packets</span><strong class="green" id="rAccepted">0</strong></div>
+            <div class="detail"><span>Dropped packets</span><strong class="red" id="rDropped">0</strong></div>
+            <div class="detail"><span>Invalid packets</span><strong class="orange" id="rInvalid">0</strong></div>
+            <div class="detail"><span>Traffic rate</span><strong id="rPps">0</strong></div>
+            <div class="detail"><span>Queue usage</span><strong id="rQueue">0 / 50</strong></div>
+          </div>
+
+          <p class="small" id="receiverMessage">Waiting for backend data...</p>
+          <p class="small" id="coordinates"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">Traffic Rate — Packets / Second</div>
+          <div class="chart-wrap"><canvas id="trafficChart"></canvas></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">Simulation Controls</div>
+
+          <div class="controls">
+            <select id="target">
+              <option value="ALL">All receivers</option>
+              <option value="RX001">RX001 — Delhi</option>
+              <option value="RX002">RX002 — Mumbai</option>
+              <option value="RX003">RX003 — Bengaluru</option>
+              <option value="RX004">RX004 — Kolkata</option>
+              <option value="RX005">RX005 — Vijayawada</option>
+            </select>
+
+            <button class="btn-green" id="normalBtn">Normal Traffic</button>
+            <button class="btn-red" id="floodBtn">Start Flood Test</button>
+            <button class="btn-neutral" id="resetBtn">Reset All</button>
+          </div>
+
+          <p class="small" id="controlMessage">Select a receiver or all receivers.</p>
+        </section>
+
+        <!-- Before vs Flood Comparison -->
+        <section class="panel" id="comparisonPanel">
+          <div class="panel-heading">Before vs Flood Comparison</div>
+
+          
+<div class="controls">
+  <button class="btn-green" id="captureNormalBtn">
+    Capture Normal Baseline
+  </button>
+
+  <button class="btn-red" id="captureFloodBtn">
+    Capture Flood Result
+  </button>
+
+  <button class="btn-neutral" id="loadComparisonBtn">
+    Load Comparison Results
+  </button>
+
+  <button class="btn-green" id="exportCsvBtn">
+    Export CSV Report
+  </button>
+  <button class="btn-green" id="exportPdfBtn">
+    Export PDF Report
+  </button>
+</div>
+
+ 
+          <p class="small" id="comparisonMessage">
+            First capture a normal baseline, then run a flood test and capture the flood result.
+          </p>
+
+          <div style="overflow-x:auto; margin-top:16px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Receiver</th>
+                  <th>Normal Drop %</th>
+                  <th>Flood Drop %</th>
+                  <th>Normal Queue %</th>
+                  <th>Flood Queue %</th>
+                  <th>Attack Detected</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonTableBody">
+                <tr><td colspan="6">No comparison loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">Recent Security Events</div>
+          <div class="event-list" id="eventList">
+            <div class="small">Waiting for events...</div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <footer>
+      Prototype: software-generated metrics. Real radio measurements require compatible receiver hardware.
+    </footer>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+let selectedId = "RX005";
+let receiverData = [];
+const markers = {};
+let chart;
+
+const map = L.map("map").setView([22.5, 79], 4.5);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 18
+}).addTo(map);
+
+chart = new Chart($("trafficChart"), {
+  type: "line",
+  data: {
+    labels: [],
+    datasets: [{
+      label: "Packets / sec",
+      data: [],
+      borderColor: "#35b7ff",
+      backgroundColor: "rgba(53,183,255,.12)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    scales: {
+      x: {
+        ticks: { color: "#91a8bd", maxTicksLimit: 6 },
+        grid: { color: "#20384c" }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: "#91a8bd" },
+        grid: { color: "#20384c" }
+      }
+    },
+    plugins: {
+      legend: { labels: { color: "#e8f2ff" } }
+    }
+  }
+});
+
+function number(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+function pinColor(receiver) {
+  return receiver.attack_detected ? "#ff5364" : "#20d69a";
+}
+
+function makeIcon(color) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="width:17px;height:17px;border-radius:50%;
+      background:${color};border:3px solid white;
+      box-shadow:0 0 14px ${color};"></div>`,
+    iconSize: [17, 17],
+    iconAnchor: [8, 8]
+  });
+}
+
+function renderMap(receivers) {
+  receivers.forEach(r => {
+    if (r.lat == null || r.lon == null) return;
+
+    const popup = `<b>${escapeHtml(r.id)} — ${escapeHtml(r.location)}</b><br>
+      Status: ${escapeHtml(r.status)}<br>
+      Rate: ${number(r.pps)} packets/sec`;
+
+    if (!markers[r.id]) {
+      markers[r.id] = L.marker([r.lat, r.lon], {
+        icon: makeIcon(pinColor(r))
+      }).addTo(map);
+
+      markers[r.id].on("click", () => selectReceiver(r.id));
+    }
+
+    markers[r.id].setLatLng([r.lat, r.lon]);
+    markers[r.id].setIcon(makeIcon(pinColor(r)));
+    markers[r.id].bindPopup(popup);
+  });
+}
+
+function selectReceiver(id) {
+  selectedId = id;
+  $("target").value = id;
+  renderReceiverList();
+  updateSelected();
+}
+
+function renderReceiverList() {
+  $("receiverList").innerHTML = receiverData.map(r => `
+    <button class="receiver ${r.id === selectedId ? "selected" : ""}"
+      data-id="${escapeHtml(r.id)}">
+      <div class="receiver-top">
+        <strong>${escapeHtml(r.id)} — ${escapeHtml(r.location)}</strong>
+        <span class="status ${r.attack_detected ? "attack" : ""}">
+          ${escapeHtml(r.status)}
+        </span>
+      </div>
+      <div class="small">
+        ${number(r.pps)} packets/sec · Queue ${number(r.queue_size)}/50
+      </div>
+    </button>
+  `).join("");
+
+  document.querySelectorAll(".receiver").forEach(button => {
+    button.addEventListener("click", () => selectReceiver(button.dataset.id));
+  });
+}
+
+function updateSelected() {
+  const r = receiverData.find(item => item.id === selectedId);
+  if (!r) return;
+
+  $("selectedTitle").textContent = `Receiver Details — ${r.id}`;
+  $("selectedStatus").textContent = r.status;
+  $("selectedStatus").className =
+    "status" + (r.attack_detected ? " attack" : "");
+
+  $("rTotal").textContent = number(r.packets_received);
+  $("rAccepted").textContent = number(r.accepted_packets);
+  $("rDropped").textContent = number(r.dropped_packets);
+  $("rInvalid").textContent = number(r.invalid_packets);
+  $("rPps").textContent = number(r.pps);
+  $("rQueue").textContent = `${number(r.queue_size)} / 50`;
+  $("receiverMessage").textContent = r.message || "";
+
+  $("coordinates").textContent =
+    r.lat != null && r.lon != null
+      ? `Demo coordinates: ${Number(r.lat).toFixed(4)}, ${Number(r.lon).toFixed(4)}`
+      : "";
+}
+
+function renderEvents(events) {
+  $("eventList").innerHTML = events.length
+    ? events.slice(0, 8).map(event => `
+      <div class="event">
+        <strong>${escapeHtml(event.event)}</strong>
+        <div>${escapeHtml(event.receiver_id)}</div>
+        <div>${escapeHtml(event.details)}</div>
+        <time>${new Date(event.time * 1000).toLocaleTimeString()}</time>
+      </div>
+    `).join("")
+    : '<div class="small">No security events recorded.</div>';
+}
+
+async function refreshDashboard() {
+  try {
+    const response = await fetch("/api/status", { cache: "no-store" });
+    if (!response.ok) throw new Error("API returned " + response.status);
+
+    const data = await response.json();
+
+    receiverData = Array.isArray(data.receivers)
+      ? data.receivers
+      : Object.values(data.receivers || {});
+
+    $("total").textContent = number(data.totals?.packets_received);
+    $("accepted").textContent = number(data.totals?.accepted_packets);
+    $("dropped").textContent = number(data.totals?.dropped_packets);
+    $("attacks").textContent = number(data.active_attacks);
+
+    $("pps").textContent = number(
+      receiverData.reduce((sum, r) => sum + Number(r.pps || 0), 0)
+    );
+
+    $("invalid").textContent = number(
+      receiverData.reduce((sum, r) => sum + Number(r.invalid_packets || 0), 0)
+    );
+
+    renderMap(receiverData);
+    renderReceiverList();
+    updateSelected();
+    renderEvents(data.events || []);
+
+    const selected = receiverData.find(r => r.id === selectedId);
+
+    if (selected) {
+      chart.data.labels.push(new Date().toLocaleTimeString());
+      chart.data.datasets[0].data.push(selected.pps);
+
+      if (chart.data.labels.length > 30) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+
+      chart.update("none");
+    }
+
+    $("controlMessage").textContent =
+      "Connected · Source: " + (data.data_source || "SIMULATION");
+
+  } catch (error) {
+    $("controlMessage").textContent =
+      "Backend connection failed. Check Flask terminal.";
+  }
+}
+
+async function changeMode(mode) {
+  $("normalBtn").disabled = true;
+  $("floodBtn").disabled = true;
+
+  try {
+    const response = await fetch("/api/mode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode,
+        receiver_id: $("target").value
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Request failed");
+    }
+
+    $("controlMessage").textContent = result.message;
+    await refreshDashboard();
+
+  } catch (error) {
+    $("controlMessage").textContent =
+      "Could not change mode: " + error.message;
+  } finally {
+    $("normalBtn").disabled = false;
+    $("floodBtn").disabled = false;
+  }
+}
+
+$("normalBtn").addEventListener("click", () => changeMode("normal"));
+$("floodBtn").addEventListener("click", () => changeMode("flood"));
+
+$("resetBtn").addEventListener("click", async () => {
+  try {
+    const response = await fetch("/api/reset", { method: "POST" });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Reset failed");
+    }
+
+    $("controlMessage").textContent = "Simulation counters reset.";
+    await refreshDashboard();
+
+  } catch (error) {
+    $("controlMessage").textContent = error.message;
+  }
+});
+
+$("target").addEventListener("change", event => {
+  if (event.target.value !== "ALL") {
+    selectReceiver(event.target.value);
+  }
+});
+
+/* Capture normal or flood snapshot */
+async function captureSnapshot(label) {
+  const message = $("comparisonMessage");
+  const button = label === "normal"
+    ? $("captureNormalBtn")
+    : $("captureFloodBtn");
+
+  button.disabled = true;
+  message.textContent = `Capturing ${label} snapshot...`;
+
+  try {
+    const response = await fetch("/api/comparison/capture", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Snapshot capture failed");
+    }
+
+    message.textContent = data.message || `${label} snapshot captured.`;
+
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+$("captureNormalBtn").addEventListener("click", () => {
+  captureSnapshot("normal");
+});
+
+$("captureFloodBtn").addEventListener("click", () => {
+  captureSnapshot("flood");
+});
+
+/* Load comparison table */
+$("loadComparisonBtn").addEventListener("click", async () => {
+  const message = $("comparisonMessage");
+  const tbody = $("comparisonTableBody");
+  const button = $("loadComparisonBtn");
+
+  button.disabled = true;
+  message.textContent = "Loading comparison...";
+
+  try {
+    const response = await fetch("/api/comparison/results", {
+      cache: "no-store"
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Could not load comparison");
+    }
+
+    tbody.replaceChildren();
+
+    data.comparison.forEach(item => {
+      const row = document.createElement("tr");
+
+      const values = [
+        `${item.receiver_id} — ${item.location}`,
+        `${item.normal_drop_rate}%`,
+        `${item.flood_drop_rate}%`,
+        `${item.normal_queue_utilization}%`,
+        `${item.flood_queue_utilization}%`,
+        item.flood_attack_detected ? "YES" : "NO"
+      ];
+
+      values.forEach(value => {
+        const cell = document.createElement("td");
+        cell.textContent = value;
+        row.appendChild(cell);
+      });
+
+      tbody.appendChild(row);
+    });
+
+    message.textContent =
+      `Loaded ${data.count} receiver comparison results. Simulation data only.`;
+
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+refreshDashboard();
+setInterval(refreshDashboard, 1000);
+$("exportCsvBtn").addEventListener("click", () => {
+  window.location.href = "/api/comparison/export";
+});
+$("exportPdfBtn").addEventListener("click", () => {
+  window.location.href = "/api/comparison/pdf";
+});
+</script>
+</body>
+</html>
